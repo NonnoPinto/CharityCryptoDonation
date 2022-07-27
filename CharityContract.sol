@@ -1,5 +1,7 @@
 pragma solidity ^0.5.8;
 
+//Charity donation smrt contract
+
 contract Charity {
     address payable owner;
     //può essere meglio un mapping?
