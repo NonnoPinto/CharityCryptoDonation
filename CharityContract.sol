@@ -1,6 +1,6 @@
 pragma solidity ^0.5.8;
 
-//Charity donation smart contract
+//Charity donation smart contract bachelor
 
 contract Charity {
     address payable owner;
