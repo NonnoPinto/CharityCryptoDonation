@@ -1,6 +1,6 @@
 pragma solidity ^0.5.8;
 
-//Charity donation smrt contract
+//Charity donation smart contract
 
 contract Charity {
     address payable owner;
