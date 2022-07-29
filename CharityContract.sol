@@ -1,13 +1,19 @@
 pragma solidity ^0.5.8;
+pragma experimental ABIEncoderV2;
 
 //Charity donation smart contract
 
 contract Charity {
     address payable owner;
-    //può essere meglio un mapping?
-    address payable[] public charityAddresses; //come fare per i singoli progetti?
-    uint256[] public totalDonationsAmount;
-
+    struct project{
+        string projectName;
+        address payable projectAddress;
+        uint256 totalDonation;
+    }
+    //e se, arrivati a far inserire, la gente scrive in modo diverso??
+    mapping(string => project[]) charitiesMap;
+    string[] charitiesArr;
+   
     constructor() public {
         owner = msg.sender;
     }
@@ -18,17 +24,35 @@ contract Charity {
         _;
     }
 
-    // Validates that the sender originated the transfer is different than the target destination
-    // -->mettere slashing?<--
-    modifier validateDestination(address payable destinationAddress){
-        //not to yout own
-        require(msg.sender != destinationAddress, 'Sender and recipient cannot be the same.');
-        //to charity in array
-        bool find = false;
-        for (uint256 i = 0; i < charityAddresses.length; i++)
-            if (charityAddresses[i] == destinationAddress)
-                find = true;
-        require(find, 'Cant find address');
+    // Helper functions
+    // Return project index on success, length otherwise
+    function findProject(string memory _charity, string memory _project) internal view returns(uint){
+        uint i;
+        for (i = 0; i < charitiesMap[_charity].length; i++)
+            if ((keccak256(abi.encodePacked(charitiesMap[_charity][i].projectName))) == (keccak256(abi.encodePacked(_project))))
+                return i;
+        return i;
+    }
+
+    // Return charity index on success, length otherwise
+    /* function findCharity(string memory _charity) public view returns(uint){
+        uint i;
+        for (i = 0; i < charitiesArr.length; i++)
+            if ((keccak256(abi.encodePacked(charitiesArr[i]))) == (keccak256(abi.encodePacked(_charity))))
+                return i;
+        return i;
+    } */
+
+    // Charity validation
+    // Non credo serva davvero
+    modifier validateCharity(string memory _charity){
+        require (charitiesMap[_charity].length > 0, 'Cant find requested charity');
+        _;
+    }
+
+    // Project validation
+    modifier validateProject(string memory _charity, string memory _project){
+        require (findProject(_charity, _project) < charitiesMap[_charity].length, 'Cant find requested project');
         _;
     }
 
@@ -38,47 +62,48 @@ contract Charity {
         _;
     }
 
-    // Transmits the address of the donor and the amount donated.
-    // -->Questo serve solo per potermi "abbonare" alle donazioni?<--
-    event Donation(
-        address indexed _donor,
-        uint256 _value
-    );
+    // All charities
+    // Mi serve davvero?
+    function getAllCharities() public view returns(string[] memory){
+        return charitiesArr;
+    }
+
+    // All projects
+    function getAllProjects(string memory _charity) public view 
+    validateCharity(_charity) returns(project[] memory){
+        return charitiesMap[_charity];
+    }
+
+    // All donations
+    function getDonations(string memory _charity, string memory _project) public view
+    validateCharity(_charity) validateProject(_charity, _project) returns(uint256) {
+        return charitiesMap[_charity][findProject(_charity, _project)].totalDonation;
+    }
 
     //Donation
-    //-->Da capire<--
-    function deposit(address payable destinationAddress /*, address payable project  */) public
-    validateDestination(destinationAddress) validateTransferAmount() payable {
-        /* uint256 donationAmount = msg.value; */
+    function deposit(string memory _charity, string memory _project) public
+    validateCharity(_charity) validateProject(_charity, _project) validateTransferAmount() payable {
         uint256 donationAmount = msg.value;
+        uint proTmp = findProject(_charity, _project);
 
-        destinationAddress.transfer(donationAmount);
+        charitiesMap[_charity][proTmp].projectAddress.transfer(donationAmount);
 
-        /* emit Donation(msg.sender, donationAmount); */
-
-        //Non ne vedo la necessità... o sì?
-        for (uint256 i = 0; i < charityAddresses.length; i++)
-            if (charityAddresses[i]==destinationAddress)
-                totalDonationsAmount[i] += donationAmount;
-
-        /* if (donationAmount > highestDonation) {
-            highestDonation = donationAmount;
-            highestDonor = msg.sender;
-        } */
+        charitiesMap[_charity][proTmp].totalDonation += donationAmount;
     }
 
     // Add new charity address
-    // Verificare che non ci sia già!!
-    function addCharity(address payable _charity) public restrictToOwner(){
-        charityAddresses.push(_charity);
-        totalDonationsAmount.push(0);
+    function addCharity(string memory _charity, string memory _projectN, address payable _projectA) public
+    restrictToOwner(){
+        // Preparo l'oggetto
+        project memory tmp;
+        tmp.projectName = _projectN;
+        tmp.projectAddress = _projectA;
+        tmp.totalDonation = 0;
+        // Usando push se esiste
+        charitiesMap[_charity].push(tmp);
+        if (charitiesMap[_charity].length == 1)
+            charitiesArr.push(_charity);
     }
-
-    // Add new charity's foundraising
-    // -->Come distinguo l'associazione dai suoi progetti?<--
-    /* function addFound(address payable _charity, address payable _project) public restrictToOwner(){
-        charityAddresses[_charity].push(_project);
-    } */
 
     // Destroys the contract and renders it unusable.
     function destroy() public restrictToOwner() {
