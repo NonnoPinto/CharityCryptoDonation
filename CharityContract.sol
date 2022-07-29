@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
     Charity donation Ethereum smart contract
     Each charity association must ask for at least one project
     A project can be supported by many associations, but it wont be linekd
-    Charities and projects are stored with their names
+    Charities and projects are stored with their name and address
     RULES:
         - no spaces
         - every word starts with capital letter
@@ -22,10 +22,16 @@ contract Charity {
         address payable projectAddress;
         uint256 totalDonation;
     }
+    // Charity struct
+    struct charity{
+        string charityName;
+        address charityAddress;
+    }
     // Mapping one charity to many projects
+    // !!Cannot have udt as key value!!
     mapping(string => project[]) charitiesMap;
     // String to better navigate in charities
-    string[] charitiesArr;
+    charity[] charitiesArr;
    
     constructor() public {
         owner = msg.sender;
@@ -81,13 +87,14 @@ contract Charity {
     }
 
     // All charities
-    function getAllCharities() public view returns(string[] memory){
+    function getAllCharities() public view returns(charity[] memory){
         return charitiesArr;
     }
 
     // All _charity's projects
     function getAllProjects(string memory _charity) public view 
     validateCharity(_charity) returns(project[] memory){
+        // Return an array of struct, ts pipe will do his job
         return charitiesMap[_charity];
     }
 
@@ -110,7 +117,7 @@ contract Charity {
     }
 
     // Add new project address
-    function addCharity(string memory _charity, string memory _projectN, address payable _projectA) public
+    function addCharity(string memory _charity, address _charityAddr, string memory _projectN, address payable _projectA) public
     restrictToOwner(){
         project memory tmp;
         // Filling struct
@@ -121,8 +128,12 @@ contract Charity {
         // add to already existing key otherwise
         charitiesMap[_charity].push(tmp);
         // if its first _charity's project, add to array
-        if (charitiesMap[_charity].length == 1)
-            charitiesArr.push(_charity);
+        if (charitiesMap[_charity].length == 1){
+            charity memory tmpChar;
+            tmpChar.charityName = _charity;
+            tmpChar.charityAddress = _charityAddr;
+            charitiesArr.push(tmpChar);
+        }
     }
 
     // Destroys contract
