@@ -18,14 +18,14 @@ contract Charity {
     address payable owner;
     // Project struct
     struct project{
-        string projectName;
-        address payable projectAddress;
+        string name;
+        address payable addr;
         uint256 totalDonation;
     }
     // Charity struct
     struct charity{
-        string charityName;
-        address charityAddress;
+        string name;
+        address addr;
     }
     // Mapping one charity to many projects
     // !!Cannot have udt as key value!!
@@ -43,32 +43,51 @@ contract Charity {
         _;
     }
 
+    // Check if access address is charity owner
+    // -->DA SISTEMARE<--
+    // Non dovrebbe servire perchè Angular permette l'accesso a queste funzioni solo se msg.sender è il titolare di un'associazione
+    // Oppure è qualcosa di aggirabile da console?
+    modifier restrictToAdmin(){
+        string memory charityN = findCharity();
+        require (bytes(charityN).length != 0, 'You are not an already known charity association');
+        _;
+    }
+
     // --> Helper functions <--
     // Find project index by charity and project name
     // Return project index on success, length otherwise
     function findProject(string memory _charity, string memory _project) internal view returns(uint){
         uint i;
         for (i = 0; i < charitiesMap[_charity].length; i++)
-            if ((keccak256(abi.encodePacked(charitiesMap[_charity][i].projectName))) == (keccak256(abi.encodePacked(_project))))
+            if ((keccak256(abi.encodePacked(charitiesMap[_charity][i].name))) == (keccak256(abi.encodePacked(_project))))
                 return i;
         return i;
     }
 
-    // Finda charity index by name
-    // Return charity index on success, length otherwise
-    /* function findCharity(string memory _charity) public view returns(uint){
+    function findProjectAddr(string memory _charity, address payable _project) internal view returns(uint){
         uint i;
-        for (i = 0; i < charitiesArr.length; i++)
-            if ((keccak256(abi.encodePacked(charitiesArr[i]))) == (keccak256(abi.encodePacked(_charity))))
+        for (i = 0; i < charitiesMap[_charity].length; i++)
+            if (charitiesMap[_charity][i].addr == _project)
                 return i;
         return i;
-    } */
+    }
+
+    // Finda charity index by address
+    // Return charity name on success, empty string otherwise
+    function findCharity() public view returns(string memory){
+        uint i;
+        for (i = 0; i < charitiesArr.length; i++)
+            if (charitiesArr[i].addr == msg.sender)
+                return charitiesArr[i].name;
+        return "";
+    }
 
     // Check id charity exist
+    // Non so se funziona
     modifier validateCharity(string memory _charity){
-        /* charitiesMap[_charity] is string[]
-        charities are always added with at least one project
-        if array's length isnt > 0 it means it does not exist */
+        /* charitiesMap[_charity] key is project[]
+        Charities are always added with at least one project
+        If array's length isnt > 0 it means it does not exist */
         require (charitiesMap[_charity].length > 0, 'Cant find requested charity');
         _;
     }
@@ -110,30 +129,43 @@ contract Charity {
         uint256 donationAmount = msg.value;
         // Finding project index
         uint proTmp = findProject(_charity, _project);
-        // Donating for project
-        charitiesMap[_charity][proTmp].projectAddress.transfer(donationAmount);
+        // Donating to project
+        charitiesMap[_charity][proTmp].addr.transfer(donationAmount);
         // Update total donation
         charitiesMap[_charity][proTmp].totalDonation += donationAmount;
     }
 
-    // Add new project address
-    function addCharity(string memory _charity, address _charityAddr, string memory _projectN, address payable _projectA) public
-    restrictToOwner(){
-        project memory tmp;
+    // Add new charity
+    function addCharity(string memory _charity, address _charityAddr, string memory _project, address payable _projectAddr) public
+    restrictToOwner() {
         // Filling struct
-        tmp.projectName = _projectN;
-        tmp.projectAddress = _projectA;
+        project memory tmp;
+        tmp.name = _project;
+        tmp.addr = _projectAddr;
         tmp.totalDonation = 0;
-        // map[id].push() add new key -> value if it's _charity first project
-        // add to already existing key otherwise
+        // map[id].push() add new key -> value
         charitiesMap[_charity].push(tmp);
-        // if its first _charity's project, add to array
-        if (charitiesMap[_charity].length == 1){
-            charity memory tmpChar;
-            tmpChar.charityName = _charity;
-            tmpChar.charityAddress = _charityAddr;
-            charitiesArr.push(tmpChar);
-        }
+        // its first _charity's project, add to array
+        charity memory tmpChar;
+        tmpChar.name = _charity;
+        tmpChar.addr = _charityAddr;
+        charitiesArr.push(tmpChar);
+    }
+
+    // Add new project address
+    function addProject(string memory _project, address payable _projectAddr) public
+    restrictToAdmin() {
+        string memory charityN = findCharity();
+        // Check if charity is reusing an address (cant have different project with same address) or a name
+        require(findProjectAddr(charityN, _projectAddr) == charitiesMap[charityN].length, 'You\'ve already used this address');
+        require(findProject(charityN, _project) == charitiesMap[charityN].length, 'You\'ve already used this name');
+        // Filling struct
+        project memory tmp;
+        tmp.name = _project;
+        tmp.addr = _projectAddr;
+        tmp.totalDonation = 0;
+        // map[id].push() add new project
+        charitiesMap[charityN].push(tmp);
     }
 
     // Destroys contract
