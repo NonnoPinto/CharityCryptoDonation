@@ -22,16 +22,14 @@ contract Charity {
         address payable addr;
         uint256 totalDonation;
     }
-    // Charity struct
-    struct charity{
-        string name;
-        address addr;
-    }
+    // Charity mapping
+    mapping(string => address) charityToAddr;
+    mapping(address => string) addrToCharity;
+    // Charities array, frontend porpouse
+    string[] charitiesArr;
     // Mapping one charity to many projects
     // !!Cannot have udt as key value!!
     mapping(string => project[]) charitiesMap;
-    // String to better navigate in charities
-    charity[] charitiesArr;
    
     constructor() public {
         owner = msg.sender;
@@ -44,9 +42,6 @@ contract Charity {
     }
 
     // Check if access address is charity owner
-    // -->DA SISTEMARE<--
-    // Non dovrebbe servire perchè Angular permette l'accesso a queste funzioni solo se msg.sender è il titolare di un'associazione
-    // Oppure è qualcosa di aggirabile da console?
     modifier restrictToAdmin(){
         string memory charityN = findCharity();
         require (bytes(charityN).length != 0, 'You are not an already known charity association');
@@ -54,8 +49,9 @@ contract Charity {
     }
 
     // --> Helper functions <--
+
     // Find project index by charity and project name
-    // Return project index on success, length otherwise
+    // Return project index on success, full length otherwise
     function findProject(string memory _charity, string memory _project) internal view returns(uint){
         uint i;
         for (i = 0; i < charitiesMap[_charity].length; i++)
@@ -64,6 +60,8 @@ contract Charity {
         return i;
     }
 
+    // Find project index by charity name and project address
+    // Return project index on success, full length otherwise
     function findProjectAddr(string memory _charity, address payable _project) internal view returns(uint){
         uint i;
         for (i = 0; i < charitiesMap[_charity].length; i++)
@@ -72,14 +70,10 @@ contract Charity {
         return i;
     }
 
-    // Finda charity index by address
+    // Find charity index by address
     // Return charity name on success, empty string otherwise
     function findCharity() public view returns(string memory){
-        uint i;
-        for (i = 0; i < charitiesArr.length; i++)
-            if (charitiesArr[i].addr == msg.sender)
-                return charitiesArr[i].name;
-        return "";
+        return(addrToCharity[msg.sender]);
     }
 
     // Check id charity exist
@@ -106,7 +100,7 @@ contract Charity {
     }
 
     // All charities
-    function getAllCharities() public view returns(charity[] memory){
+    function getAllCharities() public view returns(string[] memory){
         return charitiesArr;
     }
 
@@ -124,7 +118,7 @@ contract Charity {
     }
 
     // Donation
-    function deposit(string memory _charity, string memory _project) public
+    function donate(string memory _charity, string memory _project) public
     validateCharity(_charity) validateProject(_charity, _project) validateTransferAmount() payable {
         uint256 donationAmount = msg.value;
         // Finding project index
@@ -145,11 +139,10 @@ contract Charity {
         tmp.totalDonation = 0;
         // map[id].push() add new key -> value
         charitiesMap[_charity].push(tmp);
-        // its first _charity's project, add to array
-        charity memory tmpChar;
-        tmpChar.name = _charity;
-        tmpChar.addr = _charityAddr;
-        charitiesArr.push(tmpChar);
+        // its first _charity's project, add to mapping
+        charityToAddr[_charity] = _charityAddr;
+        addrToCharity[_charityAddr] = _charity;
+        charitiesArr.push(_charity);
     }
 
     // Add new project address
